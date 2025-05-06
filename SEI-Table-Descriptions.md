@@ -9,7 +9,7 @@
 
 The data from `unique_commits` is filtered to the target time period and then joined with the users file `user_data_country_sectors_cleaned` based on the commit author ID (the `author_id` column in the commits data corresponds to the `id` column in the user data), resulting in data containing the fields: `branch`, `commit_year`, and `country`.
 
-To identify collaborations with the U.S., the data are subsetted to only branches that have at least one commit author where `country == 'United States'`. For collaborations among non-U.S. countries, the data are subsetted to commit authors where `country != 'United States'`.
+To identify collaborations with the U.S., the data are subsetted to only branches that have at least one commit author where `country` is not equal to 'United States'. For collaborations among non-U.S. countries, the data are subsetted to commit authors where `country` is not equal to 'United States'`.
 
 The table of counts is obtained separately for each dataset (the U.S. collaborations data and the non-U.S. collaborations data) by grouping the data by `country` and counting the distinct values of `branch`.
 
@@ -81,11 +81,71 @@ Check the step labeled "Aggregate to total fractional credit per country". It's 
 
 **Time Period**: 2009-2023
 
+**Methods**: 
+
+The users data from the Code.gov data file `user_data_country_sectors_cleaned_codegov_merged` is subsetted to users with a `country` value of "United States" and a `sector` value of "government." The user-level data is then joined with the commits data from the Code.gov commits data file `unique_commits_2009_2023_codegov_merged`, based on the commit author ID (the `author_id` column in the commits data corresponds to the `id` column in the user data). The joined data, referred to as `joined_data`, is deduplicated to only contain distinct combinations of the fields `branch`, `org`, and `min_commit_year`. Note that `min_commit_year` is a variable at the level of user-branch combinations that denotes the earliest year that a given user authored a commit in a given branch, during the period beginning in 2009.
+
+The dataset `branch_org_data` is then created from `joined_data` by aggregating to combinations of `branch` and `org`, with the variable `first_commit_year` computed by finding the minimum value of `min_commit_year` across all users within a given combination of `org` and `branch`.
+
+The count of repositories *created* by each organization in a given year is computed by grouping `branch_org_data` by combinations of `org` and `first_commit_year`, counting the number of distinct values of `branch`. The counts for specific agencies are obtained by restricting the values of `org` to a list of 24 specific agencies, such as "Department of Agriculture" and "Social Security Administration." The federal total is obtained by using all values of `org` from the Code.gov data file. As a result, the total count of new repositories each year across the list of specific agencies should generally be less than or equal to the federal total.
+
+**Display Details**:
+
+The display order of the agencies should be as follows:
+
+- Federal Total
+- Agency for International Development
+- Department of Agriculture
+- Department of Commerce
+- Department of the Interior
+- Department of Defense
+- Department of Education
+- Department of Energy
+- Department of Health and Human Services
+- Department of Homeland Security
+- Department of Housing and Urban Development
+- Department of Justice
+- Department of Labor
+- Department of the Treasury
+- Department of Transportation
+- Department of Veterans Affairs
+- Environmental Protection Agency
+- Federal Election Commission
+- General Services Administration
+- National Aeronautics and Space Administration
+- National Science Foundation
+- Office of Personnel Management
+- Small Business Administration
+- Social Security Administration
+- Department of State
+
+**Temporary QC Notes**:
+
+The logic for identifying the year of a repo's creation may be incorrect. The script that performs the calculations for Table SINV-83 defines the repo creation year as the minimum value of the user-by-branch variable `min_commit_year`, aggregated over all users within a given branch. However, `min_commit_year` is created in the "Data_Prep" script by identifying the first commit year for each user within the period beginning in 2009. Perhaps a repo created before 2009 might only have values of `min_commit_year` dating to 2009 or later, and thus would incorrectly be counted as having been created in 2009 or later.
+
 # Table INV-4
 
 **Caption**: GitHub repositories contributed to by selected entities: 2009-2023
 
 **Time Period**: 2009-2023
+
+**Methods**:
+
+The users data from the Code.gov data file `user_data_country_sectors_cleaned_codegov_merged` is subsetted to users with a `country` value of "United States" and a `sector` value of "government." The user-level data is then joined with the commits data from the Code.gov commits data file `unique_commits_2009_2023_codegov_merged`, based on the commit author ID (the `author_id` column in the commits data corresponds to the `id` column in the user data). The joined data, referred to as `joined_data`, is deduplicated to only contain distinct combinations of the fields `branch`, `org`, and `min_commit_year`. Note that `min_commit_year` is a variable at the level of user-branch combinations that denotes the earliest year that a given user authored a commit in a given branch, during the period beginning in 2009.
+
+The dataset `branch_org_data` is then created from `joined_data` by aggregating to combinations of `branch` and `org`, with the variable `first_commit_year` computed by finding the minimum value of `min_commit_year` across all users within a given combination of `org` and `branch`.
+
+The count of repositories *contributed to* by each organization in a given year is computed by grouping `branch_org_data` by `org` and counting the distinct values of `branch`. Note that the Table INV-4 approach for counting the number of repositories *contributed to*  differs from the Table SINV-83 approach for counting the number of repositories *created*. 
+
+The counts for specific agencies are obtained by restricting the values of `org` to a list of 24 specific agencies, such as "Department of Agriculture" and "Social Security Administration." The federal total is obtained by using all values of `org` from the Code.gov data file. As a result, the total count of new repositories each year across the list of specific agencies should generally be less than or equal to the federal total.
+
+**Temporary QC Notes**:
+
+The logic for identifying the year of a repo's creation may be incorrect. The script that performs the calculations for Table SINV-83 defines the repo creation year as the minimum value of the user-by-branch variable `min_commit_year`, aggregated over all users within a given branch. However, `min_commit_year` is created in the "Data_Prep" script by identifying the first commit year for each user within the period beginning in 2009. Perhaps a repo created before 2009 might only have values of `min_commit_year` dating to 2009 or later, and thus would incorrectly be counted as having been created in 2009 or later.
+
+**Consistency Checks**:
+
+- Check that the sums across years in Table SINV-83 equal the values reported in Table INV-4.
 
 # Supp Data for Table INV-4
 
