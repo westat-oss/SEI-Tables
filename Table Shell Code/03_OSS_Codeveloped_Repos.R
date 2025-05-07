@@ -57,17 +57,21 @@ generate_co_dev_repos <- function(
   ## 5) For each branch, generate all unique unordered country pairs ----
   country_pairs <- co_dev_data %>%
     group_by(branch) %>%
-    summarise(country_list = list(unique(country))) %>%
+    summarise(
+    country_list = list(unique(country)),
+    n_users = n_distinct(author_id),
+    .groups = "drop"
+  ) %>%
+    filter(n_users >= 2) %>% # Repositories must have more than 2 distinct users to be co-developed
     mutate(country_pair = map(country_list, function(x) {
-      if(length(x) >= 2) combn(sort(x), 2, simplify = FALSE) else list()
-    })) %>%
-    unnest(country_pair) %>%
-    mutate(
-      Country1 = map_chr(country_pair, ~ .x[1]),
-      Country2 = map_chr(country_pair, ~ .x[2])
-    ) %>%
-    select(branch, Country1, Country2) %>%
-    ungroup()
+  if (length(x) >= 2) combn(sort(x), 2, simplify = FALSE) else list()
+  })) %>%
+  unnest(country_pair) %>%
+  mutate(
+  Country1 = map_chr(country_pair, ~ .x[1]),
+  Country2 = map_chr(country_pair, ~ .x[2])
+  ) %>%
+   select(branch, Country1, Country2)
   
   ## 6) Summarize co-developed branches per country pair ----
   co_dev_summary <- country_pairs %>%
