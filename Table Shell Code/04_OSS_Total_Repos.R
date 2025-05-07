@@ -44,7 +44,10 @@ generate_total_repos <- function(
   )))
   
   ## 3) Join commits with users, filter by year, and select branch & country ----
- 
+  # - This type of joining method is done to account for fractional credit to missing author_ids 
+  # in the commits file. We still end up with same total repositories as an inner join, but a larger
+  # weight of the credit is shifted towards "Missing Country"
+    
   # Step 1: Left join commits to users
   expanded_commits <- commits %>%
     filter(commit_year == year) %>%
