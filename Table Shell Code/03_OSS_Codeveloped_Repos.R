@@ -62,7 +62,7 @@ generate_co_dev_repos <- function(
     n_users = n_distinct(author_id),
     .groups = "drop"
   ) %>%
-    filter(n_users >= 2) %>% # Repositories must have more than 2 distinct users to be co-developed
+    filter(n_users >= 2) %>% # Repositories must have 2 or more distinct users to be co-developed
     mutate(country_pair = map(country_list, function(x) {
   if (length(x) >= 2) combn(sort(x), 2, simplify = FALSE) else list()
   })) %>%
