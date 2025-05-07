@@ -51,10 +51,24 @@ generate_sectors_table <- function(
   commits <- tbl(con, sql(paste0("SELECT * FROM read_parquet('", commits_file, "')")))
   
   ## 3) Join Commits and Users ----
-  joined_data <- commits %>%
-    inner_join(users_expanded, by = c("author_id" = "id")) %>%
-    select(branch, min_commit_year, author_id, sector_val, country_val)
+    
+   # Step 1: Left join commits to users
+  expanded_commits <- commits %>%
+    left_join(users_expanded, by = c("author_id" = "id"))
   
+  # Step 2: Find branches with at least one matched user
+  branches_with_valid_id <- expanded_commits %>%
+    filter(sql("country_val IS NOT NULL AND sector_val IS NOT NULL")) %>%   # ← country_val and sector_val comes from users
+    distinct(branch)
+  
+  # Step 3: Filter to only those branches
+  joined_data <- expanded_commits %>%
+    semi_join(branches_with_valid_id, by = "branch") %>%
+    mutate(country_val = ifelse(is.na(country_val) | country_val == "", "Missing", country_val),
+           sector_val  = ifelse(is.na(sector_val) | sector_val == "", "Unclassified", sector_val)
+           ) %>%
+    select(branch, min_commit_year, author_id, country_val, sector_val)
+    
   ## 4) Compute per-user credit ----
   user_frac <- joined_data %>%
     group_by(branch) %>%
@@ -73,7 +87,16 @@ generate_sectors_table <- function(
     ) %>%
     ungroup()
   
-  ## 6) Separate country aggregations ----
+  ## 6) Build category summaries ----
+
+    # (a) Total Repos
+  total_repos <- user_frac %>%
+    distinct(branch, min_commit_year, author_id, user_credit) %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(user_credit), .groups="drop") %>%
+    mutate(Sector = "Total Repos")
+    
+  # (b) Total U.S.
   total_us <- cs_frac %>%
     filter(country_val == "United States") %>%
     distinct(branch, min_commit_year, author_id, country_val, sector_val, cross_frac) %>%
@@ -81,6 +104,7 @@ generate_sectors_table <- function(
     summarise(total_fraction = sum(cross_frac), .groups = "drop") %>%
     mutate(Sector = "Total (US)")
   
+  # (c) Total excluding U.S.(Global)
   total_global <- cs_frac %>%
     filter(country_val != "United States" & country_val != "Missing") %>%
     distinct(branch, min_commit_year, author_id, country_val, sector_val, cross_frac) %>%
@@ -88,21 +112,31 @@ generate_sectors_table <- function(
     summarise(total_fraction = sum(cross_frac), .groups = "drop") %>%
     mutate(Sector = "Total (Global)")
   
-  ## 7) Sector-Based Aggregation ----
+  # (d) Sector-Based U.S. Aggregation 
   sector_agg <- cs_frac %>%
     filter(country_val == "United States") %>%
     distinct(branch, min_commit_year, author_id, sector_val, country_val, cross_frac) %>%
     group_by(sector_val, min_commit_year) %>%
     summarise(total_fraction = sum(cross_frac), .groups = "drop") %>%
     rename(Sector = sector_val)
+
+# (e) Total Missing Country
+  miss_country <- cs_frac %>%
+    distinct(branch, min_commit_year, author_id, country_val, sector_val, cross_frac) %>%
+    filter(country_val == "Missing") %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(cross_frac), .groups="drop") %>%
+    mutate(Sector = "Total (Missing Country)")
   
-  ## 8) Pivot and Merge ----
+  ## 7) Pivot and Merge ----
   year_cols <- as.character(2009:2023)
   
   summary_df <- bind_rows(
+    total_repos %>% collect(),
     total_us      %>% collect(),
     total_global       %>% collect(),
-    sector_agg %>% collect()
+    sector_agg %>% collect(),
+    miss_country %>% collect()
   ) %>%
     mutate(year = as.character(min_commit_year)) %>%
     select(Sector, year, total_fraction) %>%
@@ -115,9 +149,11 @@ generate_sectors_table <- function(
     mutate(across(all_of(year_cols), ~ round(.x, 0)))
   
   
-  ## 9) Order Columns and Rows ----
+  ## 8) Order Columns and Rows ----
   
-  desired_order <- c("Total (Global)", "Total (US)", "Academic", "Government", "Business", "Nonprofit", "Unclassified")
+  desired_order <- c("Total Repos", "Total (Global)", "Total (US)", 
+                     "Academic", "Government", "Business", "Nonprofit", "Unclassified", 
+                     "Total (Missing Country)")
   
   final <- summary_df %>%
     mutate(Sector = recode(Sector,
@@ -129,7 +165,7 @@ generate_sectors_table <- function(
     arrange(Sector)
   
   
-  ## 10) Write to Excel ----
+  ## 9) Write to Excel ----
   if (!is.null(output_file)) {
     wb <- if (file.exists(output_file)) loadWorkbook(output_file) else createWorkbook()
     if (!(sheet_name %in% names(wb))) addWorksheet(wb, sheet_name)
