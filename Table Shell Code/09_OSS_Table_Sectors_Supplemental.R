@@ -43,8 +43,20 @@ generate_sectors_table_supplemental <- function(
   commits <- tbl(con, sql(paste0("SELECT * FROM read_parquet('", commits_file, "')")))
   
   # 3) Join commits and users ----
-  joined_data <- commits %>%
-    inner_join(users_expanded, by = c("author_id" = "id")) %>%
+    
+  # Step 1: Left join commits to users
+  expanded_commits <- commits %>%
+                        left_join(users_expanded, by = c("author_id" = "id"))
+  
+  # Step 2: Find branches with at least one matched user
+  branches_with_valid_id <- expanded_commits %>%
+    filter(sql("country_val IS NOT NULL")) %>%   # ← country_val comes from users
+    distinct(branch)
+  
+  # Step 3: Filter to only those branches
+  joined_data <- expanded_commits %>%
+    semi_join(branches_with_valid_id, by = "branch") %>%
+    mutate(country_val = ifelse(is.na(country_val) | country_val == "", "Missing", country_val)) %>%
     select(branch, min_commit_year, author_id, country_val)
   
   # 4) Compute user-level credit ----
@@ -61,46 +73,89 @@ generate_sectors_table_supplemental <- function(
            fraction = user_credit / n_countries) %>%
     ungroup()
   
-  # 6) Aggregate by country and year ----
-  country_agg <- country_frac %>%
+   # 6) Build category summaries ----
+    
+   # (a) Total Repos
+  total_repos <- user_frac %>%
+    distinct(branch, min_commit_year, author_id, user_credit) %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(user_credit), .groups="drop") %>%
+    mutate(Country = "Total Repos")
+  
+  # (b) Total assigned to any country
+  any_country <- country_frac %>%
+    distinct(branch, min_commit_year, author_id, country_val, fraction) %>%
+    filter(country_val != "Missing") %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(fraction), .groups="drop") %>%
+    mutate(Country = "Total (Any Country)")
+  
+  # (c) Top 10 countries by overall fractional sum
+  country_totals <- country_frac %>%
+    distinct(branch, min_commit_year, author_id, country_val, fraction) %>%
+    filter(country_val != "Missing") %>%           # drop Missing here
+    group_by(country_val) %>%
+    summarise(overall = sum(fraction), .groups = "drop") %>%
+    slice_max(order_by = overall, n = 10) %>%      # top 10
+    pull(country_val)
+  
+  top10_countries <- country_frac %>%
+    filter(country_val %in% country_totals) %>%
     distinct(branch, min_commit_year, author_id, country_val, fraction) %>%
     group_by(country_val, min_commit_year) %>%
-    summarise(total_fraction = sum(fraction), .groups = "drop")
+    summarise(total_fraction = sum(fraction), .groups="drop") %>%
+    mutate(Country = country_val)  # use the country name as the Country
+ 
+  # (d) All Other Countries (not in top 10 and not Missing)
+  all_other_countries <- country_frac %>%
+    distinct(branch, min_commit_year, author_id, country_val, fraction) %>%
+    filter(!(country_val %in% country_totals), country_val != "Missing") %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(fraction), .groups = "drop") %>%
+    mutate(Country = "All Other Countries")
   
-  # 7) Pivot to wide format ----
-  country_agg_df <- country_agg %>% collect()
+  # (e) Total Missing Country
+  miss_country <- country_frac %>%
+    distinct(branch, min_commit_year, author_id, country_val, fraction) %>%
+    filter(country_val == "Missing") %>%
+    group_by(min_commit_year) %>%
+    summarise(total_fraction = sum(fraction), .groups="drop") %>%
+    mutate(Country = "Total (Missing Country)")
   
-  year_cols <- as.character(2009:2023)
-  country_wide <- country_agg_df %>%
+  # 7) Collect & bind rows ----
+  year_cols   <- as.character(2009:2023)
+  country_summary <- bind_rows(
+    total_repos      %>% collect(),
+    any_country      %>% collect(),
+    top10_countries  %>% collect(),
+    all_other_countries %>% collect(),
+    miss_country     %>% collect()
+  )
+  
+  # 8) Pivot & round ----
+  country_wide <- country_summary %>%
     mutate(year = as.character(min_commit_year)) %>%
-    select(country_val, year, total_fraction) %>%
+    select(Country, year, total_fraction) %>%
     pivot_wider(
-      names_from = year,
+      names_from  = year,
       values_from = total_fraction,
       values_fill = list(total_fraction = 0)
-    )
-  
-  # 8) Select top 10 by overall total ----
-  country_wide <- country_wide %>%
-    mutate(overall_total = rowSums(across(all_of(intersect(year_cols, names(.)))))) %>%
-    rename(Country = country_val) %>%
-    select(Country, all_of(year_cols), overall_total)
-  
-  top10_countries <- country_wide %>%
-    arrange(desc(overall_total)) %>%
-    slice_head(n = 11) %>%
-    select(-overall_total) %>%
+    ) %>%
+    select(Country, all_of(intersect(year_cols, names(.)))) %>%
     mutate(across(all_of(year_cols), ~ round(.x, 0)))
   
   # 9) Write to Excel ----
   if (!is.null(output_file)) {
     wb <- if (file.exists(output_file)) loadWorkbook(output_file) else createWorkbook()
     if (!(sheet_name %in% names(wb))) addWorksheet(wb, sheet_name)
-    writeData(wb, sheet = sheet_name, x = top10_countries, startRow = start_row, colNames = TRUE)
+    writeData(wb, sheet     = sheet_name,
+              x         = country_wide,
+              startRow  = start_row,
+              colNames  = TRUE)
     saveWorkbook(wb, output_file, overwrite = TRUE)
   }
   
-  return(top10_countries)
+  return(country_wide)
 }
 
 #_______________________________________________________________________________
