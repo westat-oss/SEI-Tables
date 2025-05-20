@@ -13,9 +13,10 @@ library(purrr)
 # The users file is un-nested for organization, country, and sector. We filter for U.S. government users.
 # Then, for each distinct branch–institution (i.e. organization) combination, the earliest commit year is used.
 #
-# Two aggregations are performed:
+# Three aggregations are performed:
 #   1. Detailed Agency Aggregation: for rows where the institution is in a specified list.
-#   2. Federal Total Aggregation: overall distinct branch count (ignoring organization).
+#   2. Federal Total Aggregation: overall branch count for all distinct institutions.
+#   3. All Other Federal Aggregation: for rows where institution is not in specified list
 #
 # The overall counts are summed across all years (so no separate year columns), and the results are
 # output with two columns: "Institution" and "Number of repositories".
@@ -95,6 +96,7 @@ generate_table_INV4 <- function(
   
   ## 4) Compute branch-org data: for each branch-org combination, use the earliest commit year ----
   branch_org_data <- joined_data %>%
+    distinct(branch, org, min_commit_year) %>% 
     group_by(branch, org) %>%
     summarise(first_commit_year = min(min_commit_year), .groups = "drop")
   
@@ -105,21 +107,26 @@ generate_table_INV4 <- function(
     summarise(new_branches = n_distinct(branch), .groups = "drop")
   
   ## 6) Federal Total Aggregation: overall distinct branch count (ignoring organization) ----
-  federal_counts_overall <- joined_data %>%
-    group_by(branch) %>%
-    summarise(first_commit_year = min(min_commit_year), .groups = "drop") %>%
-    summarise(new_branches = n_distinct(branch), .groups = "drop") %>%
+  federal_counts_overall <- branch_org_data %>%
+    summarise(new_branches = n(), .groups = "drop") %>%
     mutate(org = "Federal Total")
-  
-  ## 7) Combine the agency and federal totals into one table ----
+
+ ## 7) All Other Federal Aggregation: overall distinct branch count from all distinct orgs not in specified agency list ----
+  other_federal_counts <- branch_org_data %>%
+    filter(!(org %in% agency_list)) %>%
+    summarise(new_branches = n(), .groups = "drop") %>%
+    mutate(org = "All Other Federal")
+    
+  ## 8) Combine the agency and federal totals into one table ----
   
   # Collect the aggregated results into data frames before binding
   agency_df <- agency_counts_overall %>% collect()
   federal_df <- federal_counts_overall %>% collect()
+  other_federal_counts_df <- other_federal_counts %>% collect()
+    
+  final_table <- bind_rows(agency_df, federal_df, other_federal_counts_df)
   
-  final_table <- bind_rows(agency_df, federal_df)
-  
-  ## 8) Rename columns and order rows ----
+  ## 9) Rename columns and order rows ----
   final_table <- final_table %>%
     rename(Institution = org, `Number of repositories` = new_branches)
   
@@ -149,13 +156,15 @@ generate_table_INV4 <- function(
     "Office of Personnel Management",
     "Small Business Administration",
     "Social Security Administration",
-    "Department of State"
+    "Department of State",
+    "All Other Federal"
   )
+    
   final_table <- final_table %>%
     mutate(Institution = factor(Institution, levels = desired_order)) %>%
     arrange(Institution)
   
-  ## 9) Write the final table to the Excel workbook ----
+  ## 10) Write the final table to the Excel workbook ----
   if (!is.null(output_file)) {
     if (file.exists(output_file)) {
       wb <- loadWorkbook(output_file)
@@ -185,7 +194,7 @@ users_file_path   <- "user_data_country_sectors_cleaned_codegov_merged.parquet"
 commits_file_path <- "unique_commits_2009_2023_codegov_merged.parquet"
 
 # Define output Excel file and sheet name 
-output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Output_codegov\\SEI_2026_Shells_Output_Preliminary_codegov.xlsx"
+output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Deliverable\\SEI_2026_Shells_Output_v4.xlsx"
 sheet <- "Table INV-4"
 start_row <- 4
 
