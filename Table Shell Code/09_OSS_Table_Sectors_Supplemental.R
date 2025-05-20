@@ -59,11 +59,17 @@ generate_sectors_table_supplemental <- function(
     mutate(country_val = ifelse(is.na(country_val) | country_val == "", "Missing", country_val)) %>%
     select(branch, min_commit_year, author_id, country_val)
   
-  # 4) Compute user-level credit ----
+  # 4) Compute user-level credit ---- (Restrict credit to users in the earliest year for the branch)
   user_frac <- joined_data %>%
     group_by(branch) %>%
-    mutate(n_users = n_distinct(author_id),
-           user_credit = 1.0 / n_users) %>%
+    mutate(branch_year = min(min_commit_year)) %>%   # Get earliest commit year for branch
+    ungroup() %>%
+    filter(min_commit_year == branch_year) %>%       # Keep only users from that year
+    group_by(branch) %>%
+    mutate(
+      n_min_year_users = n_distinct(author_id),
+      user_credit = 1.0 / n_min_year_users
+    ) %>%
     ungroup()
   
   # 5) Split across countries ----
