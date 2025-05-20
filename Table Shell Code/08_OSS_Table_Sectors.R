@@ -69,7 +69,7 @@ generate_sectors_table <- function(
            ) %>%
     select(branch, min_commit_year, author_id, country_val, sector_val)
     
-  ## 4) Compute per-user credit ----
+  ## 4) Compute per-user credit ---- (Restrict credit to users in the earliest year for the branch)
   user_frac <- joined_data %>%
     group_by(branch) %>%
     mutate(branch_year = min(min_commit_year)) %>%   # Get earliest commit year for branch
