@@ -95,6 +95,7 @@ generate_table_SINV83 <- function(
   
   ## 4) Compute branch-org data: for each branch-org combination, use the earliest commit year ----
   branch_org_data <- joined_data %>%
+    distinct(branch, org, min_commit_year) %>% 
     group_by(branch, org) %>%
     summarise(first_commit_year = min(min_commit_year), .groups = "drop")
   
