@@ -72,10 +72,15 @@ generate_sectors_table <- function(
   ## 4) Compute per-user credit ----
   user_frac <- joined_data %>%
     group_by(branch) %>%
+    mutate(branch_year = min(min_commit_year)) %>%   # Get earliest commit year for branch
+    ungroup() %>%
+    filter(min_commit_year == branch_year) %>%       # Keep only users from that year
+    group_by(branch) %>%
     mutate(
-      n_users    = n_distinct(author_id),
-      user_credit = 1.0 / n_users
-    ) %>% ungroup()
+      n_min_year_users = n_distinct(author_id),
+      user_credit = 1.0 / n_min_year_users
+    ) %>%
+    ungroup()
   
   ## 5) Expand to country-sector combinations ----
   cs_frac <- user_frac %>%
@@ -189,7 +194,7 @@ generate_sectors_table <- function(
  commits_file_path <- "unique_commits_2009_2023.parquet"
  
  # Define output Excel file and sheet name 
- output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Output_codegov\\SEI_2026_Shells_Output_Preliminary_codegov.xlsx"
+output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Deliverable\\SEI_2026_Shells_Output_v4.xlsx"
  sheet <- "Table X-XXX"
  start_row <- 4
  
