@@ -14,9 +14,9 @@ library(purrr)
 # Then, for each distinct branch–institution (i.e. organization) combination, the earliest commit year is used.
 #
 # Three aggregations are performed:
-#   1. Detailed Agency Aggregation: for rows where the institution is in a specified list.
-#   2. Federal Total Aggregation: overall branch count for all distinct institutions.
-#   3. All Other Federal Aggregation: for rows where institution is not in specified list
+#   1. Detailed Agency Aggregation: branch counts where the agency is in specified list.
+#   2. Federal Total Aggregation: overall branch count for all distinct agencies.
+#   3. All Other Federal Aggregation: branch where agency is not in specified list
 #
 # The overall counts are summed across all years (so no separate year columns), and the results are
 # output with two columns: "Institution" and "Number of repositories".
