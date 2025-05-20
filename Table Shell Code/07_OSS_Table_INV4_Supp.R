@@ -15,10 +15,13 @@ library(purrr)
 #
 # The final table includes:
 #   - A header row: "Top 10 Businesses (Global)"
+#   - All Business
 #   - The top 10 businesses
+#   - All Other Business
 #   - A header row: "Top 10 Universities (Global)"
+#   - All Academic
 #   - The top 10 universities
-#
+#   - All Other Academic
 # Each row has two columns: "Institution" and "Number of repositories".
 # The table is written to a specified Excel workbook and sheet.
 # ______________________________________________________________________________
@@ -70,47 +73,72 @@ generate_table_INV4_supp <- function(
   
   ## 5) Count distinct branches per organization (overall, ignoring year) ----
   org_counts <- branch_org_data %>%
+    distinct(branch, org, sector) %>%
     group_by(org, sector) %>%
-    summarise(new_branches = n_distinct(branch), .groups = "drop") %>%
-    collect()  # bring into R for further manipulation
+    summarise(new_branches = n(), .groups = "drop") %>%
+    collect() # bring into R for further manipulation
   
-  # Separate into business and academic
-  business_df <- org_counts %>%
+  # 6) Separate into business and academic ----
+
+  ### 6a) ---- Business ----
+  # Top 10 Business Orgs
+  business_top10 <- org_counts %>%
     filter(sector == "business", !org %in% c("", "Misc. Business")) %>%
     arrange(desc(new_branches)) %>%
     slice_head(n = 10)
   
-  academic_df <- org_counts %>%
+  # All Other Business Orgs (not in top 10)
+  business_all_other <- org_counts %>%
+    filter(sector == "business", !org %in% business_top10$org, !org %in% c("", "Misc. Business")) %>%
+    summarise(new_branches = sum(new_branches)) %>%
+    mutate(org = "All Other Business", sector = NA)
+  
+  # Business Total: sum of all business engagements
+  business_total <- org_counts %>%
+    filter(sector == "business", !org %in% c("", "Misc. Business")) %>%
+    summarise(new_branches = sum(new_branches)) %>%
+    mutate(org = "Business Total", sector = NA)
+  
+  # Business Header
+  business_header <- tibble(org = "Top 10 Businesses (Global)", sector = NA, new_branches = NA)
+  
+  ### 6b) ---- Academic ----
+  academic_top10 <- org_counts %>%
     filter(sector == "academic", !org %in% c("", "Misc. Academic")) %>%
     arrange(desc(new_branches)) %>%
     slice_head(n = 10)
   
-  # Create "header" rows
-  business_header <- tibble(
-    org = "Top 10 Businesses (Global)",
-    sector = NA_character_,
-    new_branches = NA_real_
-  )
-  academic_header <- tibble(
-    org = "Top 10 Universities (Global)",
-    sector = NA_character_,
-    new_branches = NA_real_
-  )
+  # All Other Academic Orgs
+  academic_all_other <- org_counts %>%
+    filter(sector == "academic", !org %in% academic_top10$org, !org %in% c("", "Misc. Academic")) %>%
+    summarise(new_branches = sum(new_branches)) %>%
+    mutate(org = "All Other Academic", sector = NA)
+  
+  # Academic Total
+  academic_total <- org_counts %>%
+    filter(sector == "academic", !org %in% c("", "Misc. Academic")) %>%
+    summarise(new_branches = sum(new_branches)) %>%
+    mutate(org = "Academic Total", sector = NA)
+  
+  # Academic Header
+  academic_header <- tibble(org = "Top 10 Universities (Global)", sector = NA, new_branches = NA)
   
   # Combine in the desired order
   final_df <- bind_rows(
     business_header,
-    business_df,
+    business_total,
+    business_top10,
+    business_all_other,
     academic_header,
-    academic_df
+    academic_total,
+    academic_top10,
+    academic_all_other
   ) %>%
-    select(org, new_branches)  # drop sector
-  
-  # Rename columns
-  final_df <- final_df %>%
+    select(org, new_branches) %>%
     rename(Institution = org, `Number of repositories` = new_branches)
   
-  ## 6) Write the final table to the Excel workbook ----
+  
+  ## 7) Write the final table to the Excel workbook ----
   if (!is.null(output_file)) {
     if (file.exists(output_file)) {
       wb <- loadWorkbook(output_file)
@@ -140,7 +168,7 @@ users_file_path   <- "user_data_country_sectors_cleaned.parquet"
 commits_file_path <- "unique_commits_2009_2023.parquet"
 
 # Define output Excel file and sheet name 
-output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Output_codegov\\SEI_2026_Shells_Output_Preliminary_codegov.xlsx"
+output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Deliverable\\SEI_2026_Shells_Output_v4.xlsx"
 sheet <- "Supp Data for Table INV-4"
 start_row <- 4
 
