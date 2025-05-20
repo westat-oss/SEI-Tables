@@ -14,9 +14,10 @@ library(purrr)
 # and filters for U.S. government users.
 #
 # It then groups by branch and organization to determine each branch’s earliest commit year.
-# Two aggregations are performed:
-#   1. Detailed Agency Counts: only for rows where the organization is in a specified list.
-#   2. Federal Total: overall distinct branch counts (regardless of organization).
+# Three aggregations are performed:
+#   1. Detailed Agency Counts: branch counts where the agency is in the specified list.
+#   2. Federal Total: overall branch counts for all distinct agencies 
+#   3. All Other Federal: for all distinct agencies not in specified list
 #
 # Finally, the function pivots the results so that there is one row per agency (and one row for "Federal Total")
 # with a column for each year (2009-2023) indicating the number of new branches.
