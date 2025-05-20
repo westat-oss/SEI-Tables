@@ -104,19 +104,24 @@ generate_table_SINV83 <- function(
     group_by(org, first_commit_year) %>%
     summarise(new_branches = n_distinct(branch), .groups = "drop")
   
-  ## 6) Federal Total Aggregation: overall distinct branch count (ignoring org) ----
-  federal_counts <- joined_data %>%
-    group_by(branch) %>%
-    summarise(first_commit_year = min(min_commit_year), .groups = "drop") %>%
+  ## 6) Federal Total Aggregation: overall distinct branch count from all distinct orgs ----
+  federal_counts <- branch_org_data %>%
     group_by(first_commit_year) %>%
-    summarise(new_branches = n_distinct(branch), .groups = "drop") %>%
+    summarise(new_branches = n(), .groups = "drop") %>%
     mutate(org = "Federal Total")
   
-  ## 7) Pivot the aggregations to wide format (years as columns) ----
+  ## 7) All Other Federal Aggregation: overall distinct branch count from all distinct orgs not in specified agency list ----
+  other_federal_counts <- branch_org_data %>%
+    filter(!(org %in% agency_list)) %>%
+    group_by(first_commit_year) %>%
+    summarise(new_branches = n(), .groups = "drop")%>%
+    mutate(org = "All Other Federal")
+    
+  ## 8) Pivot the aggregations to wide format (years as columns) ----
   # Collect the results into data frames before pivoting to avoid lazy evaluation issues.
   agency_counts_df <- agency_counts %>% collect()
   federal_counts_df <- federal_counts %>% collect()
-  
+  other_federal_counts_df <- other_federal_counts %>% collect()
   
   pivot_agencies <- agency_counts_df %>%
     pivot_wider(
@@ -131,9 +136,20 @@ generate_table_SINV83 <- function(
       values_from = new_branches,
       values_fill = list(new_branches = 0)
     )
-  
-  ## 8) Combine the agency rows with the Federal Total row ----
-  final_table <- bind_rows(pivot_agencies, pivot_federal)
+
+  pivot_other_federal <- other_federal_counts_df  %>%
+    pivot_wider(
+      names_from = first_commit_year,
+      values_from = new_branches,
+      values_fill = list(new_branches = 0)
+    )  
+    
+  ## 9) Combine the agency rows with the Federal Total and All Other Federal rows ----
+  final_table <- bind_rows(
+    pivot_federal,
+    pivot_agencies,
+    pivot_other_federal
+  )
   
   # -- Reorder the columns so that the year columns are in ascending order --
   
@@ -144,10 +160,8 @@ generate_table_SINV83 <- function(
   year_columns_sorted <- as.character(sort(as.numeric(year_columns)))
   
   final_table <- final_table %>% 
-    select(org, all_of(year_columns_sorted))
-  
-  # Rename "org" to "Institution"
-  final_table <- final_table %>% rename(Institution = org)
+    select(org, all_of(year_columns_sorted)) %>% 
+    rename(Institution = org) # Rename "org" to "Institution"
   
   # -- Reorder the rows --
   
@@ -177,14 +191,15 @@ generate_table_SINV83 <- function(
     "Office of Personnel Management",
     "Small Business Administration",
     "Social Security Administration",
-    "Department of State"
+    "Department of State",
+    "All Other Federal"
   )
   
   final_table <- final_table %>%
     mutate(Institution = factor(Institution, levels = desired_order)) %>%
     arrange(Institution) 
   
-  ## 9) Write the final table to the Excel workbook ----
+  ## 10) Write the final table to the Excel workbook ----
   if (!is.null(output_file)) {
     if (file.exists(output_file)) {
       wb <- loadWorkbook(output_file)
@@ -214,7 +229,7 @@ users_file_path   <- "user_data_country_sectors_cleaned_codegov_merged.parquet"
 commits_file_path <- "unique_commits_2009_2023_codegov_merged.parquet"
 
 # Define output Excel file and sheet name
-output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Output_codegov\\SEI_2026_Shells_Output_Preliminary_codegov.xlsx"
+output_excel <- "\\\\westat.com\\DFS\\DVSTAT\\Individual Directories\\Askew\\sectoring\\Code\\Production\\Deliverable\\SEI_2026_Shells_Output_v4.xlsx"
 sheet <- "Table SINV-83"
 
 # Run the function
