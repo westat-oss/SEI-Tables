@@ -21,49 +21,49 @@ These tables draw on GitHub data (and related sources) to track international co
 2. **Table Production**  
    Each script in the `Table Shell Code/` directory produces one or more tables. The output table names correspond to the sheet names in the final Excel workbook.
 
-   ### 4.2.1 Figure INV-A – International Collaborations with the U.S. and Non-U.S. Countries
+   ### Figure INV-A – International Collaborations with the U.S. and Non-U.S. Countries
    **Script:** `02_OSS_Fig_INVA.R`  
    **Purpose:** Summarizes international collaboration patterns in OSS by identifying repositories (branches) with contributors from multiple countries. Distinguishes between collaborations involving the United States and those occurring solely among non-U.S. countries. Highlights the ten most active contributing countries.  
 
    ---
 
-   ### 4.2.2 Figure YYY-Y – GitHub Collaboration Network by Country (2023)
+   ### Figure YYY-Y – GitHub Collaboration Network by Country (2023)
    **Script:** `03_OSS_Codeveloped_Repos.R`  
    **Purpose:** Presents pairwise summaries of international collaborations, listing country pairs and the number of repositories they co-developed in 2023.  
 
    ---
 
-   ### 4.2.3 Total Repos Table – GitHub Fractional Repository Count by Country (2023)
+   ### Total Repos Table – GitHub Fractional Repository Count by Country (2023)
    **Script:** `04_OSS_Total_Repos.R`  
    **Purpose:** Provides fractional counts of repositories attributed to each country. Repository credit is distributed proportionally across all countries with contributors, ensuring totals preserve the overall repository count.  
 
    ---
 
-   ### 4.2.5 Table SINV-83 – Number of New GitHub Repositories Contributed to by Selected U.S. Federal Agencies (2009–2023)
+   ### Table SINV-83 – Number of New GitHub Repositories Contributed to by Selected U.S. Federal Agencies (2009–2023)
    **Script:** `05_OSS_Table_SINV83.R`  
    **Purpose:** Reports the number of new GitHub repositories contributed to by selected federal agencies. A repository is “new” if federal contributors appear during its first year of participation. Totals are reported by agency, overall, and an “All Other Federal” category.  
 
    ---
 
-   ### 4.2.6 Table INV-4 – GitHub Repositories Contributed to by Selected U.S. Federal Agencies (2009–2023)
+   ### Table INV-4 – GitHub Repositories Contributed to by Selected U.S. Federal Agencies (2009–2023)
    **Script:** `06_OSS_Table_INV4.R`  
    **Purpose:** Reports the total number of unique GitHub repositories contributed to by federal agencies over 2009–2023. Unlike SINV-83, this aggregates across the full time span.  
 
    ---
 
-   ### 4.2.7 Table INV-4 Supplemental – Top Academic and Business Contributors (2009–2023)
+   ### Table INV-4 Supplemental – Top Academic and Business Contributors (2009–2023)
    **Script:** `07_OSS_Table_INV4_Supp.R`  
    **Purpose:** Presents the top 10 business and top 10 academic institutions worldwide contributing to OSS repositories. Uses the same methodology as INV-4, with category totals and “all other” rows.  
 
    ---
 
-   ### 4.2.8 Table XXX-X – New GitHub Repositories by U.S. Sector (2009–2023)
+   ### Table XXX-X – New GitHub Repositories by U.S. Sector (2009–2023)
    **Script:** `08_OSS_Table_Sectors.R`  
    **Purpose:** Tracks annual participation in new repositories by U.S.-based contributors, distributing fractional credit across sectors (academic, business, government, nonprofit), geographic categories, and overall totals.  
 
    ---
 
-   ### 4.2.9 Supplemental Data for Table X-XXX – Top 10 Contributing Countries (2009–2023)
+   ### Supplemental Data for Table X-XXX – Top 10 Contributing Countries (2009–2023)
    **Script:** `09_OSS_Table_Sectors_Supplemental.R`  
    **Purpose:** Provides a time series of global participation in new repositories, highlighting the 10 most active countries. Includes totals, “all other countries,” and missing data categories.  
 
